@@ -35,3 +35,5 @@ actual/
 .vs
 user-settings.mkfg
 libs/cipher/cipher-1.7/cipher.egg-info
+
+**/tags
