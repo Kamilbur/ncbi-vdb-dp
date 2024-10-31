@@ -38,4 +38,21 @@
 #include <klib/extern.h>
 #endif
 
+//#include <stdio.h>
+#include <sys/types.h>
+#include <stdint.h>
+#define DATAPLUG
+#define DPLUGDBG
+
+#ifdef DATAPLUG
+
+extern ssize_t (*s3_pread)(int, void *, size_t, size_t);
+extern void * (*s3_mmap)(void *, size_t, int, int, int, off_t);
+extern uint64_t (*s3_size)(void);
+void register_s3_pread(ssize_t (*)(int, void *, size_t, size_t), 
+                        uint64_t (*)(void));
+void register_s3_mmap(void * (*)(void *, size_t, int, int, int, off_t));
+
+#endif
+
 #endif /* _h_kfs_extern_ */

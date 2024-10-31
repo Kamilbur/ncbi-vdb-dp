@@ -24,6 +24,7 @@
 *
 */
 
+#include <kfs/extern.h>
 #include "sysmmap-priv.h"
 #include "sysfile-priv.h"
 #include <klib/rc.h>
@@ -34,6 +35,22 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <errno.h>
+
+
+#ifdef DATAPLUG
+
+void * (*s3_mmap)(void *, size_t, int, int, int, off_t) = NULL;
+static intptr_t mapped[128];
+static size_t nmap;
+
+void
+register_s3_mmap(void * (*cb)(void *, size_t, int, int, int, off_t))
+{
+    s3_mmap = cb;
+    nmap = 0;
+}
+
+#endif
 
 
 /*--------------------------------------------------------------------------
@@ -97,8 +114,24 @@ rc_t KMMapROSys ( KMMap *self, uint64_t pos, size_t size )
     if ( sf == NULL )
         return RC ( rcFS, rcMemMap, rcConstructing, rcFile, rcIncorrect );
 
+#ifdef DATAPLUG
+# ifdef DPLUGDBG
+    printf("mmaping fd=%d pos=%lu size=%lu\n", sf->fd, pos, size);
+# endif
+    if (s3_mmap == NULL) {
+        self -> addr = mmap(0, size,
+            PROT_READ, MAP_SHARED, sf -> fd, pos);
+    }
+    else {
+        assert(nmap < 128);
+        self -> addr = calloc(size, 1u);
+        mapped[nmap++] = self -> addr;
+        s3_pread(0, self -> addr, size, pos);
+    }
+#else
     self -> addr = mmap ( 0, size,
         PROT_READ, MAP_SHARED, sf -> fd, pos );
+#endif
     if ( self -> addr != ( char* ) MAP_FAILED )
         return 0;
 
@@ -128,13 +161,25 @@ rc_t KMMapUnmap ( KMMap *self )
 {
     if ( self -> size != 0 )
     {
+#ifdef DATAPLUG
+        if (s3_mmap != NULL) {
+            for (size_t ii = 0; ii < nmap; ii++) {
+                if (self -> addr == mapped[ii]) {
+                    free(self -> addr);
+                    mapped[ii] = mapped[--nmap];
+                    break;
+                }
+
+            }
+        }
+#else
         if ( munmap ( self -> addr - self -> addr_adj,
                  self -> size + self -> size_adj ) )
         {
             if ( errno != EINVAL )
                 return RC ( rcFS, rcMemMap, rcDestroying, rcNoObj, rcUnknown );
         }
-
+#endif
         self -> addr = NULL;
         self -> size = 0;
     }

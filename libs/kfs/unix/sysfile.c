@@ -80,6 +80,21 @@ struct KSysFile_v1;
 #define POLLRDHUP 0
 #endif
 
+#ifdef DATAPLUG
+
+ssize_t (*s3_pread)(int, void *, size_t, size_t) = NULL;
+uint64_t (*s3_size)(void) = NULL;
+
+void
+register_s3_pread(ssize_t (*pread_cb)(int, void *, size_t, size_t),
+            uint64_t (*size_cb)(void))
+{
+    s3_pread = pread_cb;
+    s3_size = size_cb;
+}
+
+#endif
+
 /*--------------------------------------------------------------------------
  * KSysFile
  *  a Unix file
@@ -215,6 +230,13 @@ rc_t KSysFileSize_v1 ( const KSysFile_v1 *self, uint64_t *size )
     rc_t rc = 0;
     int lerrno;
 
+#ifdef DATAPLUG
+    if (s3_size != NULL) {
+        * size = s3_size();
+    }
+    
+#endif
+
     if ( fstat ( self -> fd, & st ) != 0 ) switch ( lerrno = errno )
     {
     case EBADF:
@@ -311,7 +333,17 @@ rc_t KSysFileRead_v1 ( const KSysFile_v1 * self, uint64_t pos,
         }
 #endif
 
+#ifdef DATAPLUG
+        if (s3_pread == NULL) {
+            count = pread ( self -> fd, buffer, bsize, pos );
+        }
+        else {
+            count = s3_pread(self->fd, buffer, bsize, pos);
+        }
+#else
         count = pread ( self -> fd, buffer, bsize, pos );
+#endif
+
 
         if ( count < 0 ) switch ( lerrno = errno )
         {
