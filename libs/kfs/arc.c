@@ -2214,14 +2214,14 @@ rc_t KArcFileMake (KArcFile ** self,
     if (rc == 0)
     {
         /* we need to check chunked files here as well */
-        if (((node->type == ktocentrytype_file) &&
+        if ( s3_remote_size == 0 && (((node->type == ktocentrytype_file) &&
              (node->u.contiguous_file.file_size > 0) &&
              (size < (node->u.contiguous_file.file_size +
                       node->u.contiguous_file.archive_offset))) ||
             ((node->type == ktocentrytype_chunked) &&
              (node->u.chunked_file.file_size > 0) &&
              (size < (node->u.chunked_file.chunks[node->u.chunked_file.num_chunks-1].source_position +
-                      node->u.chunked_file.chunks[node->u.chunked_file.num_chunks-1].size))))
+                      node->u.chunked_file.chunks[node->u.chunked_file.num_chunks-1].size)))))
             rc = RC (rcFS, rcFile, rcConstructing, rcArc, rcIncomplete);
         else
         {

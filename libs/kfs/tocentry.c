@@ -48,6 +48,10 @@
 #include <string.h>
 #include <byteswap.h>
 
+#ifdef DATAPLUG
+    int s3_remote_size = 0;
+#endif
+
 
 /* ======================================================================
  * KTocEntry
@@ -581,7 +585,12 @@ rc_t KTocEntryGetFileSize ( const KTocEntry * self, uint64_t * size )
 	    return RC (rcFS, rcFile, rcAccessing, rcFileDesc, rcIncorrect);
 
 	case ktocentrytype_file:
-	    *size = self->u.contiguous_file.file_size;
+        if (s3_remote_size > 0) {
+            *size = s3_remote_size;
+        }
+        else {
+    	    *size = self->u.contiguous_file.file_size;
+        }
 	    return 0;
 
 	case ktocentrytype_chunked:

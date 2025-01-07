@@ -82,6 +82,7 @@ struct KSysFile_v1;
 
 #ifdef DATAPLUG
 
+#include <unistd.h>
 ssize_t (*s3_pread)(int, void *, size_t, size_t) = NULL;
 uint64_t (*s3_size)(void) = NULL;
 
@@ -231,8 +232,14 @@ rc_t KSysFileSize_v1 ( const KSysFile_v1 *self, uint64_t *size )
     int lerrno;
 
 #ifdef DATAPLUG
-    if (s3_size != NULL) {
+    char headbuff[5] = {0, 0, 0, 0, 0};
+    int serrno = errno;
+    if ( pread( self -> fd, headbuff, 4, 0) == -1) {
+        errno = serrno;
+    }
+    else if (strncmp(headbuff, "s3re", 4) == 0 && s3_size != NULL) {
         * size = s3_size();
+        return 0;
     }
     
 #endif

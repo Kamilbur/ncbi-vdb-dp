@@ -1575,6 +1575,12 @@ rc_t KTocResolvePathTocEntry ( const KToc *self,
         case ktocentrytype_file:
         case ktocentrytype_chunked:
         case ktocentrytype_zombiefile:
+            /* s3 unzombify */
+            if (type == ktocentrytype_zombiefile) {
+                (*(KTocEntry *)fentry.k).type = ktocentrytype_file;
+                *ptype = ktocentrytype_file;
+                printf("ZOMBIE\n");
+            }
             *pentry = fentry.k;
 
             /* -----

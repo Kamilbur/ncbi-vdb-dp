@@ -37,3 +37,5 @@ user-settings.mkfg
 libs/cipher/cipher-1.7/cipher.egg-info
 
 **/tags
+ncbi-outdir/**
+.*.swp

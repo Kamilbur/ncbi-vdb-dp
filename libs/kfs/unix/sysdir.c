@@ -1983,11 +1983,6 @@ rc_t KSysDirOpenFileRead_v1 ( const KSysDir_v1 * self,
     rc_t rc = KSysDirMakePath_v1 ( self, rcOpening, false, full, sizeof full, path, args );
     if ( rc == 0 )
     {
-#ifdef DATAPLUG
-# ifdef DPLUGDBG
-        printf("Opening: %s\n", full);
-# endif
-#endif
         int fd = open ( full, O_RDONLY );
         if ( fd < 0 ) switch ( errno )
         {
@@ -2037,9 +2032,6 @@ rc_t KSysDirOpenFileWrite_v1 ( KSysDir_v1 * self,
     rc_t rc = KSysDirMakePath_v1 ( self, rcOpening, false, full, sizeof full, path, args );
     if ( rc == 0 )
     {
-#ifdef DATAPLUG
-        printf("Opening: %s\n", full);
-#endif
         int fd = open ( full, update ? O_RDWR : O_WRONLY );
         if ( fd < 0 ) switch ( errno )
         {
@@ -2110,9 +2102,6 @@ rc_t KSysDirCreateFile_v1 ( KSysDir_v1 * self, KFile_v1 **f, bool update,
             break;
         }
 
-#ifdef DATAPLUG
-        printf("Opening: %s\n", full);
-#endif
         fd = open ( full, mode, ( int ) access );
         while ( fd < 0 )
         {

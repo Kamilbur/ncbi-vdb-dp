@@ -115,9 +115,6 @@ rc_t KMMapROSys ( KMMap *self, uint64_t pos, size_t size )
         return RC ( rcFS, rcMemMap, rcConstructing, rcFile, rcIncorrect );
 
 #ifdef DATAPLUG
-# ifdef DPLUGDBG
-    printf("mmaping fd=%d pos=%lu size=%lu\n", sf->fd, pos, size);
-# endif
     if (s3_mmap == NULL) {
         self -> addr = mmap(0, size,
             PROT_READ, MAP_SHARED, sf -> fd, pos);
