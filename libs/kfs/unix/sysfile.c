@@ -83,8 +83,36 @@ struct KSysFile_v1;
 #ifdef DATAPLUG
 
 #include <unistd.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 ssize_t (*s3_pread)(int, void *, size_t, size_t) = NULL;
 uint64_t (*s3_size)(void) = NULL;
+
+int shm_fd;
+char *shm_buf = NULL;
+size_t s3_size_val;
+
+void
+register_shmem(const char *name, size_t length)
+{
+    s3_size_val = length;
+
+    shm_fd = shm_open(name, O_RDONLY, 0);
+    if (shm_fd == -1) {
+        perror("shm_open");
+        exit(EXIT_FAILURE);
+    }
+
+    void *shm_ptr;
+    if ((shm_ptr = mmap(0, length, PROT_READ, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
+        perror("mmap");
+        close(shm_fd);
+        exit(EXIT_FAILURE);
+    }
+    shm_buf = (char *)shm_ptr;
+}
 
 void
 register_s3_pread(ssize_t (*pread_cb)(int, void *, size_t, size_t),
@@ -237,8 +265,13 @@ rc_t KSysFileSize_v1 ( const KSysFile_v1 *self, uint64_t *size )
     if ( pread( self -> fd, headbuff, 4, 0) == -1) {
         errno = serrno;
     }
-    else if (strncmp(headbuff, "s3re", 4) == 0 && s3_size != NULL) {
-        * size = s3_size();
+    else if (strncmp(headbuff, "s3re", 4) == 0) {
+        if (shm_buf) {
+            *size = s3_size_val;
+        }
+        else if (s3_size) {
+            *size = s3_size();
+        }
         return 0;
     }
     
@@ -341,11 +374,15 @@ rc_t KSysFileRead_v1 ( const KSysFile_v1 * self, uint64_t pos,
 #endif
 
 #ifdef DATAPLUG
-        if (s3_pread == NULL) {
-            count = pread ( self -> fd, buffer, bsize, pos );
+        if (shm_buf) {
+            count = s3_size_val > pos + bsize ? bsize : s3_size_val - pos;
+            memcpy(buffer, shm_buf + pos, count);
+        }
+        else if (s3_pread) {
+            count = s3_pread(self->fd, buffer, bsize, pos);
         }
         else {
-            count = s3_pread(self->fd, buffer, bsize, pos);
+            count = pread ( self -> fd, buffer, bsize, pos );
         }
 #else
         count = pread ( self -> fd, buffer, bsize, pos );

@@ -115,15 +115,18 @@ rc_t KMMapROSys ( KMMap *self, uint64_t pos, size_t size )
         return RC ( rcFS, rcMemMap, rcConstructing, rcFile, rcIncorrect );
 
 #ifdef DATAPLUG
-    if (s3_mmap == NULL) {
-        self -> addr = mmap(0, size,
-            PROT_READ, MAP_SHARED, sf -> fd, pos);
+    if (shm_buf) {
+        self -> addr = shm_buf + pos; 
     }
-    else {
+    else if (s3_mmap) {
         assert(nmap < 128);
         self -> addr = calloc(size, 1u);
         mapped[nmap++] = self -> addr;
         s3_pread(0, self -> addr, size, pos);
+    }
+    else {
+        self -> addr = mmap(0, size,
+            PROT_READ, MAP_SHARED, sf -> fd, pos);
     }
 #else
     self -> addr = mmap ( 0, size,
@@ -159,6 +162,9 @@ rc_t KMMapUnmap ( KMMap *self )
     if ( self -> size != 0 )
     {
 #ifdef DATAPLUG
+        if (shm_buf) {
+            self->addr = NULL;
+        }
         if (s3_mmap != NULL) {
             for (size_t ii = 0; ii < nmap; ii++) {
                 if (self -> addr == mapped[ii]) {
