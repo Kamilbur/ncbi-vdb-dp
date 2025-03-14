@@ -54,10 +54,15 @@ void register_s3_pread(ssize_t (*)(int, void *, size_t, size_t),
                         uint64_t (*)(void));
 void register_s3_mmap(void * (*)(void *, size_t, int, int, int, off_t));
 
-extern int shm_fd;
-extern char *shm_buf;
-extern size_t s3_size_val;
-void register_shmem(const char *, size_t);
+struct shm_info {
+    int fd;
+    void *ptr;
+    size_t length;
+};
+extern struct shm_info shm_buf;
+extern size_t dp_sra_size;
+void register_shmem(struct shm_info *, const char *);
+void close_shmem(struct shm_info *);
 
 #endif
 

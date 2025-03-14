@@ -82,6 +82,8 @@ struct KSysFile_v1;
 
 #ifdef DATAPLUG
 
+#include <stdio.h>
+
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -90,29 +92,44 @@ struct KSysFile_v1;
 ssize_t (*s3_pread)(int, void *, size_t, size_t) = NULL;
 uint64_t (*s3_size)(void) = NULL;
 
-int shm_fd;
-char *shm_buf = NULL;
-size_t s3_size_val;
+struct shm_info shm_buf = {
+    .fd = -1,
+    .ptr = NULL,
+    .length = -1
+};
+size_t dp_sra_size;
 
 void
-register_shmem(const char *name, size_t length)
+register_shmem(struct shm_info *shm, const char *name)
 {
-    s3_size_val = length;
-
-    shm_fd = shm_open(name, O_RDONLY, 0);
-    if (shm_fd == -1) {
+    if ( (shm->fd = shm_open(name, O_RDONLY, 0)) == -1) {
         perror("shm_open");
         exit(EXIT_FAILURE);
     }
 
-    void *shm_ptr;
-    if ((shm_ptr = mmap(0, length, PROT_READ, MAP_SHARED, shm_fd, 0)) == MAP_FAILED) {
+    if ((shm->ptr = mmap(0, shm->length, PROT_READ, MAP_SHARED, shm->fd, 0)) == MAP_FAILED) {
         perror("mmap");
-        close(shm_fd);
+        close(shm->fd);
         exit(EXIT_FAILURE);
     }
-    shm_buf = (char *)shm_ptr;
 }
+
+void close_shmem(struct shm_info *shm)
+{
+    if (munmap(shm->ptr, shm->length) == -1) {
+        perror("munmap");
+        exit(EXIT_FAILURE);
+    }
+    shm->ptr = NULL;
+    shm->length = -1;
+
+    if (close(shm->fd) == -1) {
+        perror("close");
+        exit(EXIT_FAILURE);
+    }
+    shm->fd = -1;
+}
+
 
 void
 register_s3_pread(ssize_t (*pread_cb)(int, void *, size_t, size_t),
@@ -266,8 +283,8 @@ rc_t KSysFileSize_v1 ( const KSysFile_v1 *self, uint64_t *size )
         errno = serrno;
     }
     else if (strncmp(headbuff, "s3re", 4) == 0) {
-        if (shm_buf) {
-            *size = s3_size_val;
+        if (shm_buf.fd != -1) {
+            *size = dp_sra_size;
         }
         else if (s3_size) {
             *size = s3_size();
@@ -374,9 +391,10 @@ rc_t KSysFileRead_v1 ( const KSysFile_v1 * self, uint64_t pos,
 #endif
 
 #ifdef DATAPLUG
-        if (shm_buf) {
-            count = s3_size_val > pos + bsize ? bsize : s3_size_val - pos;
-            memcpy(buffer, shm_buf + pos, count);
+        if (shm_buf.fd != -1) {
+            count = dp_sra_size > pos + bsize ? bsize : dp_sra_size - pos;
+            memcpy(buffer, ((char *)shm_buf.ptr) + pos, count);
+           // printf(  "Pread: %lu,%lu\n", pos, bsize  );
         }
         else if (s3_pread) {
             count = s3_pread(self->fd, buffer, bsize, pos);
