@@ -117,13 +117,30 @@ rc_t KMMapROSys ( KMMap *self, uint64_t pos, size_t size )
 
 #ifdef DATAPLUG
     if (shm_buf.fd != -1) {
-        self -> addr = ((char *)shm_buf.ptr) + pos;
-        if (mmap_buf.ptr) {
+        if (dp_mode == 0) {
+            self -> addr = ((char *)shm_buf.ptr) + pos;
             uint64_t *i_mmap_buf = (uint64_t *)mmap_buf.ptr;
             uint64_t idx = i_mmap_buf[0];
             i_mmap_buf[2 * idx + 1] = pos;
             i_mmap_buf[2 * idx + 2] = (uint64_t) size;
             i_mmap_buf[0] = idx + 1;
+        }
+        else {
+            uint64_t *i_mmap_buf = (uint64_t *)mmap_buf.ptr;
+            uint64_t len = i_mmap_buf[0];
+            int ii;
+            for (ii = 0; ii < len; ii++) {
+                if (i_mmap_buf[3 * ii + 2] <= pos && pos < i_mmap_buf[3 * ii + 3]) {
+                    break;
+                }
+            }
+            assert(ii != len);
+            if ( (self -> addr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+                perror("mmap");
+                exit(EXIT_FAILURE);
+            }
+
+            memcpy(self -> addr, ((char *)shm_buf.ptr) + i_mmap_buf[3 * ii + 1] + pos - i_mmap_buf[3 * ii + 2], size);
         }
     }
     else if (s3_mmap) {
@@ -171,7 +188,16 @@ rc_t KMMapUnmap ( KMMap *self )
     {
 #ifdef DATAPLUG
         if (shm_buf.fd != -1) {
-            self->addr = NULL;
+            if (dp_mode == 0) {
+                self->addr = NULL;
+            }
+            else {
+                if ( munmap ( self -> addr - self -> addr_adj,
+                    self -> size + self -> size_adj ) == MAP_FAILED) {
+                    perror("munmap");
+                    exit(EXIT_FAILURE);
+                }
+            }
         }
         if (s3_mmap != NULL) {
             for (size_t ii = 0; ii < nmap; ii++) {

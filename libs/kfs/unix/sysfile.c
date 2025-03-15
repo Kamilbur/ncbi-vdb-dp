@@ -98,6 +98,7 @@ struct shm_info shm_buf = {
 struct shm_info mmap_buf;
 struct shm_info pread_buf;
 size_t dp_sra_size;
+int dp_mode = 0;
 
 void
 register_shmem(struct shm_info *shm, const char *name)
@@ -393,15 +394,27 @@ rc_t KSysFileRead_v1 ( const KSysFile_v1 * self, uint64_t pos,
 #ifdef DATAPLUG
         if (shm_buf.fd != -1) {
             count = dp_sra_size > pos + bsize ? bsize : dp_sra_size - pos;
-            memcpy(buffer, ((char *)shm_buf.ptr) + pos, count);
-
-            if (pread_buf.ptr) {
+            if (dp_mode == 0) {
+                memcpy(buffer, ((char *)shm_buf.ptr) + pos, count);
                 uint64_t *i_pread_buf = (uint64_t *)pread_buf.ptr;
                 uint64_t idx = i_pread_buf[0];
                 i_pread_buf[2 * idx + 1] = pos;
                 i_pread_buf[2 * idx + 2] = (uint64_t) bsize;
                 i_pread_buf[0] = idx + 1;
             }
+            else {
+                uint64_t *i_pread_buf = (uint64_t *)pread_buf.ptr;
+                uint64_t len = i_pread_buf[0];
+                int ii;
+                for (ii = 0; ii < len; ii++) {
+                    if (i_pread_buf[3 * ii + 2] <= pos && pos < i_pread_buf[3 * ii + 3]) {
+                        break;
+                    }
+                }
+                assert(ii != len);
+                memcpy(buffer, ((char *)shm_buf.ptr) + i_pread_buf[3 * ii + 1] + pos - i_pread_buf[3 * ii + 2], count);
+            }
+
         }
         else if (s3_pread) {
             count = s3_pread(self->fd, buffer, bsize, pos);
