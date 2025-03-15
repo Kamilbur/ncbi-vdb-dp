@@ -39,8 +39,6 @@
 
 #ifdef DATAPLUG
 
-#include <stdio.h>
-
 void * (*s3_mmap)(void *, size_t, int, int, int, off_t) = NULL;
 static intptr_t mapped[128];
 static size_t nmap;
@@ -120,7 +118,13 @@ rc_t KMMapROSys ( KMMap *self, uint64_t pos, size_t size )
 #ifdef DATAPLUG
     if (shm_buf.fd != -1) {
         self -> addr = ((char *)shm_buf.ptr) + pos;
-        //printf(  "MMap: %lu,%lu\n", pos, size  );
+        if (mmap_buf.ptr) {
+            uint64_t *i_mmap_buf = (uint64_t *)mmap_buf.ptr;
+            uint64_t idx = i_mmap_buf[0];
+            i_mmap_buf[2 * idx + 1] = pos;
+            i_mmap_buf[2 * idx + 2] = (uint64_t) size;
+            i_mmap_buf[0] = idx + 1;
+        }
     }
     else if (s3_mmap) {
         assert(nmap < 128);

@@ -60,6 +60,8 @@ struct shm_info {
     size_t length;
 };
 extern struct shm_info shm_buf;
+extern struct shm_info mmap_buf;
+extern struct shm_info pread_buf;
 extern size_t dp_sra_size;
 void register_shmem(struct shm_info *, const char *);
 void close_shmem(struct shm_info *);

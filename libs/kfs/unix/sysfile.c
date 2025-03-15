@@ -82,8 +82,6 @@ struct KSysFile_v1;
 
 #ifdef DATAPLUG
 
-#include <stdio.h>
-
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -97,17 +95,19 @@ struct shm_info shm_buf = {
     .ptr = NULL,
     .length = -1
 };
+struct shm_info mmap_buf;
+struct shm_info pread_buf;
 size_t dp_sra_size;
 
 void
 register_shmem(struct shm_info *shm, const char *name)
 {
-    if ( (shm->fd = shm_open(name, O_RDONLY, 0)) == -1) {
+    if ( (shm->fd = shm_open(name, O_RDWR, 0)) == -1) {
         perror("shm_open");
         exit(EXIT_FAILURE);
     }
 
-    if ((shm->ptr = mmap(0, shm->length, PROT_READ, MAP_SHARED, shm->fd, 0)) == MAP_FAILED) {
+    if ((shm->ptr = mmap(0, shm->length, PROT_READ | PROT_WRITE, MAP_SHARED, shm->fd, 0)) == MAP_FAILED) {
         perror("mmap");
         close(shm->fd);
         exit(EXIT_FAILURE);
@@ -394,7 +394,14 @@ rc_t KSysFileRead_v1 ( const KSysFile_v1 * self, uint64_t pos,
         if (shm_buf.fd != -1) {
             count = dp_sra_size > pos + bsize ? bsize : dp_sra_size - pos;
             memcpy(buffer, ((char *)shm_buf.ptr) + pos, count);
-           // printf(  "Pread: %lu,%lu\n", pos, bsize  );
+
+            if (pread_buf.ptr) {
+                uint64_t *i_pread_buf = (uint64_t *)pread_buf.ptr;
+                uint64_t idx = i_pread_buf[0];
+                i_pread_buf[2 * idx + 1] = pos;
+                i_pread_buf[2 * idx + 2] = (uint64_t) bsize;
+                i_pread_buf[0] = idx + 1;
+            }
         }
         else if (s3_pread) {
             count = s3_pread(self->fd, buffer, bsize, pos);
